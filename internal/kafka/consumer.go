@@ -2,6 +2,7 @@ package kafka
 
 import (
 	apis "crypto-monitor/internal/api"
+	detection "crypto-monitor/internal/detection"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -9,13 +10,23 @@ import (
 	"github.com/IBM/sarama"
 )
 
-// Consumer struct holds Kafka consumer instance
+
 type Consumer struct {
 	Client sarama.Consumer
 	Topic  string
 }
 
-// NewConsumer initializes a Kafka consumer
+var windows = make(map[string]*detection.RollingWindow)
+
+// get or create rolling window for each api
+func GetOrCreateRollingWindow(apiName string) *detection.RollingWindow {
+	if _, exists := windows[apiName]; !exists {
+		windows[apiName] = detection.NewRollingWindow(50) // around 5 secs?
+	}
+	return windows[apiName]
+}
+
+
 func NewConsumer(brokers []string, topic string) (*Consumer, error) {
 	consumer, err := sarama.NewConsumer(brokers, nil)
 	if err != nil {
@@ -25,7 +36,7 @@ func NewConsumer(brokers []string, topic string) (*Consumer, error) {
 	return &Consumer{Client: consumer, Topic: topic}, nil
 }
 
-// StartConsumer listens for messages & processes API responses
+// listen for messages and process api responses
 func (c *Consumer) StartConsumer() {
 	partitions, err := c.Client.Partitions(c.Topic)
 	if err != nil {
@@ -40,13 +51,31 @@ func (c *Consumer) StartConsumer() {
 
 		go func(pc sarama.PartitionConsumer) {
 			for msg := range pc.Messages() {
+				// log.Println("received message test")
 				var apiData apis.APIResponse
 				if err := json.Unmarshal(msg.Value, &apiData); err != nil {
-					log.Println("❌ Failed to decode message:", err)
+					log.Println("error with message: ", err)
 					continue
 				}
 
-				// Process API data differently based on source
+				source := apiData.Source
+				window := GetOrCreateRollingWindow(source)
+				
+				price := apiData.Price
+				window.AddPrice(price)
+
+				zAnomaly, bAnomaly := window.CheckAnomalies(price)
+
+				if zAnomaly {
+					fmt.Printf("sending alert for z-score anomaly for %s api at price %v\n", source, price)
+					// alerts.SendTwilioAlert(source, price, "Z-Score Anomaly")
+				}
+				if bAnomaly {
+					fmt.Printf("sending alert for bollinger anomaly for %s api at price %v\n", source, price)
+					// alerts.SendTwilioAlert(source, price, "Bollinger Bands")
+				}
+
+				// have to process differently since api schemas are different
 				switch apiData.Source {
 				case "coingecko":
 					fmt.Printf("🌍 Coingecko Data:\nPrice: %v\nTime: %v\n", apiData.Price, apiData.Timestamp)
@@ -55,11 +84,11 @@ func (c *Consumer) StartConsumer() {
 				case "kraken":
 					fmt.Printf("⚡ Kraken Data:\nPrice: %v\nTime: %v\n", apiData.Price, apiData.Timestamp)
 				default:
-					// fmt.Printf("🤖 Unknown API Data:", apiData.Price)
+					// fmt.Printf("other", apiData.Price)
 				}
 			}
 		}(pc)
 	}
 
-	select {} // Keep running
+	select {} // just so it doesn't exit
 }

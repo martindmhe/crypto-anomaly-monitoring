@@ -6,7 +6,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"fmt"
 
 	"crypto-monitor/internal/kafka"
 )

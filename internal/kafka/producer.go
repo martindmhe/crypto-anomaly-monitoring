@@ -11,13 +11,12 @@ import (
 	"github.com/IBM/sarama"
 )
 
-// Producer holds Kafka producer instance
 type Producer struct {
 	Client sarama.SyncProducer
 	Topic  string
 }
 
-// NewProducer initializes Kafka producer
+// init and return producer
 func NewProducer(brokers []string, topic string) (*Producer, error) {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
@@ -30,7 +29,7 @@ func NewProducer(brokers []string, topic string) (*Producer, error) {
 	return &Producer{Client: producer, Topic: topic}, nil
 }
 
-// SendMessage sends a message to Kafka
+// send message to kafka
 func (p *Producer) SendMessage(apiData apis.APIResponse) error {
 	msgJSON, err := json.Marshal(apiData)
 	if err != nil {
@@ -51,7 +50,7 @@ func (p *Producer) SendMessage(apiData apis.APIResponse) error {
 	return nil
 }
 
-// StartProducer continuously pulls from APIs and sends data to Kafka
+// continuously fetch from apis and send to kafka
 func (p *Producer) StartProducer() {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
