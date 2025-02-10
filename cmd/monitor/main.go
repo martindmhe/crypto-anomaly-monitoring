@@ -7,6 +7,7 @@ import (
 	"sync"
 	"syscall"
 
+	"crypto-monitor/internal/alerts"
 	"crypto-monitor/internal/kafka"
 )
 
@@ -25,6 +26,9 @@ func main() {
 		log.Fatal(err)
 	}
 	defer consumer.Client.Close()
+
+	// start redis server for rate limiting (dont blow up twilio api)
+	alerts.InitRedis()
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
