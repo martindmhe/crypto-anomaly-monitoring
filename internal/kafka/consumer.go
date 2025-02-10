@@ -3,6 +3,7 @@ package kafka
 import (
 	apis "crypto-monitor/internal/api"
 	detection "crypto-monitor/internal/detection"
+	twilio "crypto-monitor/internal/alerts"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -68,11 +69,11 @@ func (c *Consumer) StartConsumer() {
 
 				if zAnomaly {
 					fmt.Printf("sending alert for z-score anomaly for %s api at price %v\n", source, price)
-					// alerts.SendTwilioAlert(source, price, "Z-Score Anomaly")
+					twilio.SendTwilioAlert(source, price, "Z-Score Anomaly")
 				}
 				if bAnomaly {
 					fmt.Printf("sending alert for bollinger anomaly for %s api at price %v\n", source, price)
-					// alerts.SendTwilioAlert(source, price, "Bollinger Bands")
+					twilio.SendTwilioAlert(source, price, "Bollinger Bands")
 				}
 
 				// have to process differently since api schemas are different
